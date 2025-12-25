@@ -17,7 +17,7 @@ from gd_serialize import build_wave_ramps_45deg, wave_make_clones, build_ramps_a
 from settings import AppSettings
 from audio_analysis import analyze_audio
 from generator import generate_level
-from gd_serialize import build_k4_polyline, serialize_gmd
+from gd_serialize import build_k4_polyline, serialize_gmd, build_k4_orb_arc
 
 class Preview(QGraphicsView):
     def __init__(self):
@@ -328,6 +328,12 @@ class MainWindow(QMainWindow):
         self.chk_onset.setChecked(self.settings.peaks.use_onset_env)
         self.chk_onset.stateChanged.connect(self.on_params_changed)
 
+
+        self.chk_start_as_wave = QCheckBox("Start as wave")
+        self.chk_start_as_wave.setChecked(bool(self.settings.path.start_as_wave))
+        self.chk_start_as_wave.stateChanged.connect(self.on_params_changed)
+
+
         self.sp_wave_angle = QDoubleSpinBox()
         self.sp_wave_angle.setRange(1.0, 89.0)
         self.sp_wave_angle.setDecimals(1)
@@ -346,6 +352,11 @@ class MainWindow(QMainWindow):
         self.chk_wave_ramps.setChecked(self.settings.path.wave_place_ramps)
         self.chk_wave_ramps.stateChanged.connect(self.on_params_changed)
 
+        self.chk_start_as_wave = QCheckBox("Start as wave")
+        self.chk_start_as_wave.setChecked(bool(self.settings.path.start_as_wave))
+        self.chk_start_as_wave.stateChanged.connect(self.on_params_changed)
+
+
         self.sp_ramp_size = QDoubleSpinBox()
         self.sp_ramp_size.setRange(5.0, 200.0)
         self.sp_ramp_size.setDecimals(1)
@@ -357,6 +368,7 @@ class MainWindow(QMainWindow):
         form.addRow("Min sep (s)", self.sp_minsep)
         form.addRow("Peak percentile", self.sp_percentile)
         form.addRow("", self.chk_onset)
+        form.addRow("", self.chk_start_as_wave)
         form.addRow("Wave angle", self.sp_wave_angle)
         form.addRow("Wave rail gap", self.sp_wave_gap)
         form.addRow("", self.chk_wave_ramps)
@@ -419,6 +431,16 @@ class MainWindow(QMainWindow):
         self.settings.path.wave_place_ramps = bool(self.chk_wave_ramps.isChecked())
         self.settings.path.wave_ramp_size_units = float(self.sp_ramp_size.value())
 
+        self.settings.path.start_as_wave = bool(self.chk_start_as_wave.isChecked())
+        self.update_wave_controls_enabled()
+
+
+    def update_wave_controls_enabled(self):
+        on = bool(self.chk_start_as_wave.isChecked())
+        self.sp_wave_angle.setEnabled(on)
+        self.sp_wave_gap.setEnabled(on)
+        self.chk_wave_ramps.setEnabled(on)
+        self.sp_ramp_size.setEnabled(on)
 
     def on_load_audio(self):
         path, _ = QFileDialog.getOpenFileName(self, "Select audio", "", "Audio (*.mp3 *.wav *.ogg *.flac);;All files (*.*)")
@@ -465,13 +487,33 @@ class MainWindow(QMainWindow):
         if not out_path.lower().endswith(".gmd"):
             out_path += ".gmd"
 
-        k4 = build_k4_polyline(
-            self.level.t_samp,
-            self.level.y_samp,
-            self.level.units_per_second,
-            self.settings.path.start_offset_s,
-            start_as_wave=bool(self.settings.path.start_as_wave)
-        )
+        if bool(self.settings.path.start_as_wave):
+            k4 = build_k4_polyline(
+                self.level.t_samp,
+                self.level.y_samp,
+                self.level.units_per_second,
+                self.settings.path.start_offset_s,
+                start_as_wave=True
+            )
+        else:
+            k4 = build_k4_orb_arc(
+                self.level.t_samp,
+                self.level.y_samp,
+                self.level.units_per_second,
+                self.settings.path.start_offset_s,
+                orb_times=self.level.orb_times,
+                orb_types=self.level.orb_types,
+                y_add=15.0,
+                orb_id_yellow=36,
+                orb_id_purple=141,
+                orb_id_blue=84,
+                orb_id_green=1022,
+                cube_portal_id=12,
+                start_with_cube=True,
+                orb_x_offset=0.0,
+                orb_y_offset=15.0,
+            )
+
 
         if self.settings.path.start_as_wave:
             above, below = wave_make_clones(

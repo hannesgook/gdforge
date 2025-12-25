@@ -45,6 +45,64 @@ def build_k4_polyline(t_samp, y_samp, units_per_second, start_offset_s, block_id
 
     return header + "".join(objs)
 
+def build_k4_orb_arc(
+    t_samp, y_samp, units_per_second, start_offset_s,
+    orb_times, orb_types,
+    y_add=15.0,
+    block_id=1764,
+    orb_id_yellow=36,
+    orb_id_purple=141,
+    orb_id_blue=84,
+    orb_id_green=1022,
+    cube_portal_id=12,
+    start_with_cube=True,
+    orb_x_offset=0.0,
+    orb_y_offset=15.0,
+):
+    header = "kS38,1_40_2_125_3_255_11_255_12_255_13_255_4_-1_6_1000_7_1_15_1_18_0_8_1,kA13,0,kA6,1,kA16,1,kA15,1,k128,0;"
+    objs = []
+
+    U = float(units_per_second)
+    off = float(start_offset_s)
+    ya = float(y_add)
+
+    if start_with_cube:
+        objs.append(f"1,{int(cube_portal_id)},2,0.000,3,{ya:.3f},155,1;")
+
+    for t, y in zip(t_samp, y_samp):
+        x = (float(t) + off) * U
+        yy = float(y) + ya
+        objs.append(f"1,{int(block_id)},2,{x:.3f},3,{yy:.3f},155,1;")
+
+    if orb_times is None or orb_types is None:
+        return header + "".join(objs)
+
+    orb_times = np.asarray(orb_times, dtype=np.float64)
+    orb_types = np.asarray(orb_types, dtype=np.int32)
+
+    if len(orb_times) == 0:
+        return header + "".join(objs)
+
+    t_s = np.asarray(t_samp, dtype=np.float64)
+    y_s = np.asarray(y_samp, dtype=np.float64)
+
+    id_by_type = {
+        0: int(orb_id_yellow),
+        1: int(orb_id_purple),
+        2: int(orb_id_blue),
+        3: int(orb_id_green),
+    }
+
+    for t, typ in zip(orb_times, orb_types):
+        x = (float(t) + off) * U + float(orb_x_offset)
+        y_on_arc = float(np.interp(float(t), t_s, y_s))
+        yy = max(0.0, y_on_arc) + float(orb_y_offset)
+        oid = id_by_type.get(int(typ), int(orb_id_yellow))
+        objs.append(f"1,{oid},2,{x:.3f},3,{yy:.3f},155,1;")
+
+    return header + "".join(objs)
+
+
 def serialize_gmd(level_name, creator_name, song_id, k4_plain):
     level_xml = build_level_xml(level_name, creator_name, k4_plain, song_id)
     return '<?xml version="1.0"?><plist version="1.0" gjver="2.0">' + level_xml + "</plist>"
@@ -163,7 +221,7 @@ def build_ramps_along_path_by_spacing(
         return (dy1 >= 0.0 and dy2 >= 0.0) or (dy1 < 0.0 and dy2 < 0.0)
 
     def place_leg(x_leg, y_leg, dx0, dy0):
-        END_MARGIN = 1e-6
+        END_MARGIN = 0//1e-9
 
         if x_leg[-1] > xs[-1] - END_MARGIN:
             return ""
