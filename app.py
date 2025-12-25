@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import math
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFileDialog, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QDoubleSpinBox, QSpinBox, QCheckBox, QGraphicsView, QGraphicsScene,
@@ -31,7 +32,7 @@ class Preview(QGraphicsView):
         factor = 1.15 if event.angleDelta().y() > 0 else 1.0 / 1.15
         self.scale(factor, factor)
 
-    def show_level(self, level):
+    def show_level(self, level, settings=None):
         sc = self.scene()
         sc.clear()
 
@@ -52,6 +53,134 @@ class Preview(QGraphicsView):
         for t in level.times:
             xx = float(t * level.units_per_second)
             sc.addLine(xx, -40.0, xx, +40.0, QPen(QColor(120, 120, 120), 1))
+
+        def parse_k4_positions(k4_plain):
+            ramps = []
+            if not k4_plain:
+                return ramps
+            for obj in k4_plain.split(";"):
+                obj = obj.strip()
+                if not obj:
+                    continue
+                parts = obj.split(",")
+                if len(parts) < 6:
+                    continue
+                d = {}
+                for i in range(0, len(parts) - 1, 2):
+                    k = parts[i].strip()
+                    v = parts[i + 1].strip()
+                    if not k:
+                        continue
+                    try:
+                        d[int(k)] = v
+                    except Exception:
+                        continue
+                if 2 not in d or 3 not in d or 6 not in d:
+                    continue
+                try:
+                    ramps.append((float(d[2]), float(d[3]), float(d[6])))
+                except Exception:
+                    pass
+            return ramps
+
+        if settings is not None:
+            try:
+                if bool(settings.path.start_as_wave):
+                    above, below = wave_make_clones(
+                        y_samp=level.y_samp,
+                        gap_units=settings.path.wave_clone_gap_units,
+                        y_min=settings.path.y_min,
+                        y_max=settings.path.y_max,
+                        y_ceil=settings.path.y_ceil
+                    )
+
+                    if bool(settings.path.wave_place_ramps) and above is not None and below is not None:
+                        ramp_spacing = float(settings.path.wave_ramp_size_units) * math.sqrt(2.0)
+
+                        k4_top = build_ramps_along_path_by_spacing(
+                            times_s=level.t_samp,
+                            y_s=above,
+                            units_per_second=level.units_per_second,
+                            start_offset_s=settings.path.start_offset_s,
+                            spacing_units=ramp_spacing,
+                            ramp_id=settings.path.wave_ramp_id,
+                            y_add=15.0,
+                            extra_rot_deg=float(settings.path.wave_ramp_extra_rotation_deg),
+                            rotate_180=True,
+                            invert_if_top=bool(settings.path.wave_ramp_invert_top),
+                            invert_if_bottom=bool(settings.path.wave_ramp_invert_bottom)
+                        )
+
+                        k4_bottom = build_ramps_along_path_by_spacing(
+                            times_s=level.t_samp,
+                            y_s=below,
+                            units_per_second=level.units_per_second,
+                            start_offset_s=settings.path.start_offset_s,
+                            spacing_units=ramp_spacing,
+                            ramp_id=settings.path.wave_ramp_id,
+                            y_add=15.0,
+                            extra_rot_deg=float(settings.path.wave_ramp_extra_rotation_deg),
+                            rotate_180=False,
+                            invert_if_top=bool(settings.path.wave_ramp_invert_top),
+                            invert_if_bottom=bool(settings.path.wave_ramp_invert_bottom)
+                        )
+
+                        top_ramps = parse_k4_positions(k4_top)
+                        bot_ramps = parse_k4_positions(k4_bottom)
+
+                        base_len = float(settings.path.wave_ramp_size_units) * math.sqrt(2.0)
+                        base_len = max(12.0, min(120.0, base_len))
+
+
+                        pen_top = QPen(QColor(255, 170, 60), 2)
+                        pen_bottom = QPen(QColor(80, 170, 255), 2)
+
+                        def draw_ramps(ramps, pen, y_src, prefer_lower_apex, invert_flag):
+                            want_lower = not (bool(prefer_lower_apex) ^ bool(invert_flag))
+
+                            for rx, ry, rot_deg in ramps:
+                                ry -= 15.0
+
+                                i = int(np.searchsorted(x, rx))
+                                if i < 1:
+                                    i = 1
+                                if i > len(y_src) - 2:
+                                    i = len(y_src) - 2
+
+                                dy_prev = float(y_src[i] - y_src[i - 1])
+                                dy_next = float(y_src[i + 1] - y_src[i])
+
+                                kink = (dy_prev != 0.0 and dy_next != 0.0 and (dy_prev > 0) != (dy_next > 0))
+                                L = base_len * (0.65 if kink else 1.0)
+
+                                ang = math.radians(rot_deg + 45.0)
+                                ux = math.cos(ang)
+                                uy = math.sin(ang)
+
+                                hx = ux * (L * 0.5)
+                                hy = uy * (L * 0.5)
+
+                                x1, y1 = rx - hx, ry - hy
+                                x2, y2 = rx + hx, ry + hy
+
+                                px, py = -uy, ux
+                                vx_a, vy_a = rx + px * (L * 0.5), ry + py * (L * 0.5)
+                                vx_b, vy_b = rx - px * (L * 0.5), ry - py * (L * 0.5)
+
+                                if want_lower:
+                                    vx, vy = (vx_a, vy_a) if (vy_a < vy_b) else (vx_b, vy_b)
+                                else:
+                                    vx, vy = (vx_a, vy_a) if (vy_a > vy_b) else (vx_b, vy_b)
+
+                                sc.addLine(x1, y1, x2, y2, pen)
+                                sc.addLine(x1, y1, vx, vy, pen)
+                                sc.addLine(x2, y2, vx, vy, pen)
+
+                        draw_ramps(top_ramps, pen_top, above, prefer_lower_apex=True,  invert_flag=bool(settings.path.wave_ramp_invert_top))
+                        draw_ramps(bot_ramps, pen_bottom, below, prefer_lower_apex=False, invert_flag=bool(settings.path.wave_ramp_invert_bottom))
+
+            except Exception:
+                pass
 
         xmin, xmax = float(x.min()), float(x.max())
         ymin, ymax = float(y.min()), float(y.max())
@@ -315,7 +444,7 @@ class MainWindow(QMainWindow):
 
         self.level = generate_level(self.times, self.settings)
 
-        self.preview.show_level(self.level)
+        self.preview.show_level(self.level, self.settings)
         self.lbl_stats.setText(f"Stats: peaks={len(self.times)} samples={len(self.level.t_samp)} ups={self.level.units_per_second:.2f}")
 
     def on_export(self):
