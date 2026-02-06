@@ -45,6 +45,47 @@ def build_k4_polyline(t_samp, y_samp, units_per_second, start_offset_s, block_id
 
     return header + "".join(objs)
 
+def build_objects_along_path_by_spacing(
+    times_s, y_s, units_per_second, start_offset_s,
+    spacing_units, block_id, y_add=15.0
+):
+    if len(times_s) == 0:
+        return ""
+    U = float(units_per_second)
+    xs = (np.asarray(times_s, dtype=np.float64) + float(start_offset_s)) * U
+    ys = np.asarray(y_s, dtype=np.float64) + float(y_add)
+
+    objs = []
+    px, py = float(xs[0]), float(ys[0])
+    objs.append(f"1,{int(block_id)},2,{px:.3f},3,{py:.3f},155,1;")
+    remain = float(spacing_units)
+
+    for i in range(1, len(xs)):
+        x1, y1 = float(xs[i-1]), float(ys[i-1])
+        x2, y2 = float(xs[i]),   float(ys[i])
+        dx = x2 - x1
+        dy = y2 - y1
+        seg = math.hypot(dx, dy)
+        if seg <= 1e-9:
+            continue
+
+        while seg >= remain - 1e-9:
+            a = remain / seg
+            px = x1 + a * dx
+            py = y1 + a * dy
+            objs.append(f"1,{int(block_id)},2,{px:.3f},3,{py:.3f},155,1;")
+            x1, y1 = px, py
+            dx = x2 - x1
+            dy = y2 - y1
+            seg = math.hypot(dx, dy)
+            remain = float(spacing_units)
+
+        remain -= seg
+        if remain < 1e-9:
+            remain = float(spacing_units)
+
+    return "".join(objs)
+
 def build_k4_orb_arc(
     t_samp, y_samp, units_per_second, start_offset_s,
     orb_times, orb_types,
@@ -69,10 +110,18 @@ def build_k4_orb_arc(
     if start_with_cube:
         objs.append(f"1,{int(cube_portal_id)},2,0.000,3,{ya:.3f},155,1;")
 
-    for t, y in zip(t_samp, y_samp):
-        x = (float(t) + off) * U
-        yy = float(y) + ya
-        objs.append(f"1,{int(block_id)},2,{x:.3f},3,{yy:.3f},155,1;")
+    # Place WHITE CIRCLES along the arc ONCE (spacing in GD units)
+    objs.append(
+        build_objects_along_path_by_spacing(
+            times_s=t_samp,
+            y_s=y_samp,
+            units_per_second=units_per_second,
+            start_offset_s=start_offset_s,
+            spacing_units=1.0,   # 1.0–2.0 is sane
+            block_id=int(block_id),
+            y_add=ya
+        )
+    )
 
     if orb_times is None or orb_types is None:
         return header + "".join(objs)
@@ -93,6 +142,7 @@ def build_k4_orb_arc(
         3: int(orb_id_green),
     }
 
+    # Place ORBS only at orb_times (beats + your extension)
     for t, typ in zip(orb_times, orb_types):
         x = (float(t) + off) * U + float(orb_x_offset)
         y_on_arc = float(np.interp(float(t), t_s, y_s))
@@ -101,6 +151,7 @@ def build_k4_orb_arc(
         objs.append(f"1,{oid},2,{x:.3f},3,{yy:.3f},155,1;")
 
     return header + "".join(objs)
+
 
 
 def serialize_gmd(level_name, creator_name, song_id, k4_plain):

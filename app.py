@@ -464,7 +464,9 @@ class MainWindow(QMainWindow):
         self.times = peak_times
         self.audio_plot.set_audio(y, sr, env, t_env, peak_times, thr)
 
-        self.level = generate_level(self.times, self.settings)
+        duration_s = float(len(y)) / float(sr) if sr else 0.0
+        self.level = generate_level(self.times, self.settings, end_time_s=duration_s)
+
 
         self.preview.show_level(self.level, self.settings)
         self.lbl_stats.setText(f"Stats: peaks={len(self.times)} samples={len(self.level.t_samp)} ups={self.level.units_per_second:.2f}")
