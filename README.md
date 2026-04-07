@@ -47,7 +47,7 @@ The path moves diagonally at 45 degrees inside a height corridor, switching dire
 
 Blocks are placed by arc-length sampling rather than by time. Cumulative path length is computed and sampled at uniform 4-unit intervals, which keeps block density visually consistent regardless of how steep the path is at any point.
 
-The exported format is GD's plain object string: `1,<id>,2,<x>,3,<y>,6,<rot>,155,1;` for every object, wrapped in a color/speed header and GD's plist envelope. On export, the song file is copied to `%localappdata%\GeometryDash\<song_id>.mp3` and linked to the level automatically, so it plays in GD without any manual setup. The song ID can be set in the app before exporting.
+The exported format is GD's plain object string: `1,<id>,2,<x>,3,<y>,6,<rot>,155,1;` for every object, wrapped in a color/speed header and GD's plist envelope. This format was reverse-engineered from `.gmd` files exported with the [GDShare](https://github.com/GDColon/GDShare) mod. On export, the song file is copied to `%localappdata%\GeometryDash\<song_id>.mp3` and linked to the level automatically, so it plays in GD without any manual setup. The song ID can be set in the app before exporting.
 
 **Object IDs:**
 
@@ -80,6 +80,8 @@ Parameter changes are debounced 300 ms before regenerating. Audio analysis runs 
 ![Result in Geometry Dash – Wave mode](docs/result_wave.png)
 
 ## Installation
+
+**Windows only.** The export copies the song file to GD's local data folder, which is Windows-specific.
 
 Python 3.8.10
 
