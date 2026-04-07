@@ -1,3 +1,7 @@
+# Copyright (c) 2025-2026 Hannes Göök
+# MIT License - GDForge
+# https://github.com/hannesgook/gdforge
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -20,7 +24,8 @@ class PathSettings:
     start_offset_s: float = 0.0
 
     dx_units: float = 4.0
-    y_start: float = 0.0
+    block_spacing_units: float = 4.0 # distance between placed path blocks (higher = fewer blocks)
+    y_start: float = 15.0 # 0.5 units above ground (ground_y = 0, 1 unit = 30)
     y_min: float = -120.0
     y_max: float = 9999.0
     y_ceil: float = 2200.0
@@ -29,7 +34,7 @@ class PathSettings:
     wave_angle_deg: float = 45.0
     wave_dx_units: Optional[float] = None
     wave_dir_up: bool = True
-    wave_corridor_units: float = 9.0
+    wave_corridor_units: float = 10
     wave_margin_units: float = 0.5
 
     wave_clone_gap_units: float = 30.0

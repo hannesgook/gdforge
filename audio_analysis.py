@@ -1,3 +1,7 @@
+# Copyright (c) 2025-2026 Hannes Göök
+# MIT License - GDForge
+# https://github.com/hannesgook/gdforge
+
 from typing import Tuple
 import numpy as np
 import librosa
@@ -12,7 +16,7 @@ def compute_env(y: np.ndarray, sr: int, ps: PeakSettings) -> Tuple[np.ndarray, n
     if ps.use_onset_env:
         env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=ps.hop, aggregate=np.median)
     else:
-        env = librosa.feature.rms(y=y, frame_length=ps.frame, hop_length=ps.hop, center=True)[0]
+        env = librosa.feature.rms(y=y, frame_length=ps.frame, hop_length=ps.hop, center=False)[0]
     env = np.asarray(env, dtype=np.float32)
     t_env = librosa.frames_to_time(np.arange(len(env)), sr=sr, hop_length=ps.hop).astype(np.float64)
     return env, t_env
@@ -23,8 +27,6 @@ def detect_peaks_from_env(env: np.ndarray, sr: int, ps: PeakSettings) -> Tuple[n
     min_dist = max(1, int(round(ps.min_sep_s * sr / ps.hop)))
     idx, _ = find_peaks(env, height=height, distance=min_dist)
     times = librosa.frames_to_time(idx, sr=sr, hop_length=ps.hop).astype(np.float64)
-    if len(times) > 0:
-        times = times[1:]
     return times, height
 
 def analyze_audio(audio_path: str, ps: PeakSettings) -> Tuple[np.ndarray, int, np.ndarray, np.ndarray, np.ndarray, float]:

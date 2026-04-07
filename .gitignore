@@ -1,0 +1,23 @@
+# Ignore everything
+*
+
+# Un-ignore specific files
+!app.py
+!audio_analysis.py
+!gd_serialize.py
+!generator.py
+!settings.py
+!requirements.txt
+!README.md
+!LICENSE
+
+# Un-ignore docs folder and everything inside it
+!docs/
+!docs/**
+
+# Un-ignore images folder and everything inside it
+!images/
+!images/**
+
+# Never ignore .gitignore itself
+!.gitignore

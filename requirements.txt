@@ -1,5 +1,7 @@
-PySide6
 numpy
-librosa
 scipy
+librosa
+soundfile
+sounddevice
+PySide6
 pyqtgraph
